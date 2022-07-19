@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta content="text/html;charset=utf-8" http-equiv="Content-Type">
+<meta name="viewport" content="initial-scale=1, maximum-scale=1">
+<title>Portal Button Custom Text</title>
+
+</head>
+
+<body>
+     
+  <center>
+  <br>  <br>
+    Portal Button Custom Text
+        <br> Send a Message
+        <br> <br>
+        <input  type="text" id="new_text" maxlength="128" style="width: 300px;" ">
+        <br>
+
+            <input type="button" value="Submit" id="sendbutton2" class="subbutton" onclick="submit(this)" />
+  
+    <div id="blurb"> </div>
+         </center>
+       <script src="https://code.jquery.com/jquery-3.5.0.min.js"></script>
+
+
+<script>
+   
+	
+    function submit(button) {
+		 var new_text = $('#new_text').val();
+        blurb.innerHTML = 'Submitting...';
+        $.post('text.php', {
+			  new_text: new_text
+        }, function(data) {
+            blurb.innerHTML = data;
+			
+        });
+    }
+
+
+</script>
+</body>
+</html>

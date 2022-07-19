@@ -25,7 +25,6 @@ uint32_t ranking = 0;
 #define PHY_USER_TIMEOUT 60000 // expose this?
 #define WEB_USER_TIMEOUT 60000 // expose this?
 
-
 // actual counts
 volatile unsigned int phy_count;
 unsigned int web_count;
@@ -58,6 +57,8 @@ char temp_string[50];
 
 char count_text[15]; // scratch space to store string
 static bool flip_display = false;
+
+char web_text[128] = {0};
 
 const char string_0[] = "If you become light-headed from thirst, feel free to pass out.";
 const char string_1[] = "Any appearance of danger is merely a device to enhance your testing experience.";
@@ -107,7 +108,7 @@ void button_press(void)
 void display_reinit(void)
 {
 
-  if (batterylevel < 13.2 || Particle.connected() == false)
+  if (batterylevel < 14)
     display.reset(1);
   else
     display.reset(0);
@@ -175,13 +176,16 @@ bool eeprom_store_phy(void)
   }
   return false;
 }
-void update_battery()
+void update_battery(bool force)
 {
-  batterylevel = (float)batterylevel * .97 + .03 * ((float)analogRead(A0)) * 4.53;
+  if(force)
+  batterylevel =((float)analogRead(A0)) * 4.53;
+  else
+    batterylevel = (float)batterylevel * .97 + .03 * ((float)analogRead(A0)) * 4.53;
 }
 void update_stats()
 {
-  update_battery();
+  update_battery(false);
   signal_rssi = 0;
   if (Cellular.ready())
   {
@@ -194,6 +198,7 @@ void update_stats()
       signal_rssi = 0;
   }
 }
+
 void update_publish(void)
 {
   static unsigned int phy_count_published = 0;
@@ -202,16 +207,22 @@ void update_publish(void)
   static unsigned int phy_users_published = 0;
   static system_tick_t last_publish_time = 0;
 
-  if (phy_count_published != phy_count || web_count_published != web_count || phy_users_published != phy_users || web_users_published != web_users || (millis() - last_publish_time > (1000 * 30 * 60)))
+  bool update_now = false;
+  if (millis() - last_publish_time > (1000 * 30 * 30))
+  {
+    update_now = true;
+  }
+
+  if (phy_count_published != phy_count || web_count_published != web_count || phy_users_published != phy_users || web_users_published != web_users || update_now)
   {
 
     if (millis() - last_publish_time > 2 * PUBLISH_TIME)
     {
-      if (millis() > PUBLISH_TIME / 2)
+      if (millis() > PUBLISH_TIME)
         last_publish_time = millis() - PUBLISH_TIME / 2;
     }
 
-    if (millis() - last_publish_time > PUBLISH_TIME && Particle.connected())
+    if ((update_now || millis() - last_publish_time > PUBLISH_TIME) && Particle.connected())
     {
       update_stats();
 
@@ -263,9 +274,25 @@ void decay_rank()
     rank_time = millis();
   }
 }
+
+void update_info(void){
+    update_stats();
+    char line1[30];
+    display.clearDisplay();
+    display.setCursor(0, 0);
+    sprintf(line1, "Bat %.2fV", ((float)batterylevel) / 1000);
+    display.print(line1);
+    sprintf(line1, "Signal %%%d", signal_rssi);
+    display.setCursor(0, 16);
+    display.print(line1);
+    display.display();
+    Particle.process();
+
+}
+
 void update_loop(void)
 {
-  update_battery();
+  update_battery(false);
   Particle.process();
 
   handle_web_count_todo();
@@ -287,22 +314,12 @@ void update_loop(void)
 
   while (millis() - phy_count_time > 5000 && digitalRead(D2) == FALSE)
   {
-    update_stats();
-    char line1[30];
-    display.clearDisplay();
-    display.setCursor(0, 0);
-    sprintf(line1, "Bat %.2fV", ((float)batterylevel) / 1000);
-    display.print(line1);
-    sprintf(line1, "Signal %%%d", signal_rssi);
-    display.setCursor(0, 16);
-    display.print(line1);
-    display.display();
-    Particle.process();
+    update_info();
   }
 }
 
 // Open a serial terminal and see the IP address printed out
-void subscriptionHandler(const char *topic, const char *data)
+void subscription_button(const char *topic, const char *data)
 {
   // if we have extra presses to do, immediately do them
   if (web_count_todo > 0)
@@ -319,6 +336,15 @@ void subscriptionHandler(const char *topic, const char *data)
   blue_led_handler(2); // blink twice
 }
 
+int subscription_text(String command)
+{
+  if (strlen(command) < (sizeof(web_text) / sizeof(char)) - 1)
+    strcpy(web_text, command);
+
+  blue_led_handler(2); // blink twice
+  return 1;
+}
+
 void setup(void)
 {
   display.begin(0x2, 0x3C); // initialize with the I2C addr 0x3C (for the 128x32)
@@ -326,11 +352,17 @@ void setup(void)
   pinMode(D7, OUTPUT);
   pinMode(D4, OUTPUT);
   attachInterrupt(D2, button_press, FALLING);
-  Particle.subscribe("web_button", subscriptionHandler);
+  Particle.subscribe("web_button", subscription_button);
+  Particle.function("web_text", subscription_text);
   Particle.publishVitals(3600);
   sprintf(temp_string, "Users Online: 0");
   eeprom_load();
   display_reinit();
+  update_battery(true);
+  while( !Particle.connected() &&  digitalRead(D2) == TRUE){
+        update_info();
+  }
+
 }
 
 void do_housekeeping(void)
@@ -378,7 +410,7 @@ void slide_animation()
 void loop(void)
 {
   // animation loop
-
+  static bool display_web_text = true;
   static bool display_url = true;
   static bool display_users = false;
   static int display_message_index = 0;
@@ -394,14 +426,35 @@ void loop(void)
     message = temp_string;
   }
   else
-    message = display_url ? string_display_url : string_table[display_message_index];
+  {
+    if (display_url)
+    {
+      if (strlen(web_text) > 0 && display_web_text)
+      {
+        message = web_text;
+        display_web_text = false;
+      }
+      else
+      {
+        message = string_display_url;
+        display_web_text = true;
+      }
+    }
+    else
+    {
+      message = string_table[display_message_index];
+    }
+  }
+
+  char display_text[128] = {0};
+  strcpy(display_text, message);
 
   // characters are 6 pixels wide
   // only animate 96 pixels past our destination, this is 32 pixels short
   // but the time will be taken up by the reinit done each cycle
 
   // scroll selected display message
-  for (unsigned int i = 0; i < (strlen(message) * 6) + 96; i++)
+  for (unsigned int i = 0; i < (strlen(display_text) * 6) + 96; i++)
   {
     display.clearDisplay();
 
@@ -409,7 +462,7 @@ void loop(void)
     display.print(count_text);
 
     display.setCursor(128 - (i * 2), flip_display ? 16 : 0);
-    display.print(message);
+    display.print(display_text);
 
     display.display();
 

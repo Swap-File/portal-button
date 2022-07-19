@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="darkreader-lock">
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
+<meta content="text/html;charset=utf-8" http-equiv="Content-Type">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0,user-scalable=0">
+<title>Portal Button 1.0</title>
+<link rel="stylesheet" type="text/css" href="portalstyle.css">
+<link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
+<link rel="stylesheet" type="text/css" href="datetimepicker/jquery.datetimepicker.min.css"/>
+<link rel="stylesheet" href="dropit/dropit.css" type="text/css" />
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://code.highcharts.com/highcharts.js"></script>
+<script src="datetimepicker/jquery.datetimepicker.full.min.js"></script>
+<script src="dropit/dropit.js"></script>
+
+
+</head>
+<body>
+
+<div id="menu_div" onclick="force_menu()">
+<ul class="menu">
+<li>
+<a><i id="menu_icon" class="fa fa-chevron-down"></i></a>
+<ul>
+<li><a onclick="set_mode(1)"><i class="fa fa-home fa-fw"></i> Live Count</a></li>
+<li><a onclick="set_mode(0)"><i class="fa fa-history fa-fw"></i> Archives</a></li>
+<li><a href="https://github.com/Swap-File/portal-button"><i class="fa fa-code fa-fw"></i> View Code</a></li>
+<li><a href="https://portalguns.com"><i class="fa fa-external-link fa-fw"></i> Portal Guns</a></li>
+<li><a href="https://console.particle.io/devices"><i class="fa fa-wrench fa-fw"></i> Console</a></li>
+
+</ul>
+</li>
+</ul>
+<div id="menutxt">Menu</div>
+</div>
+
+
+
+<div id="running_div" onclick="running_man_click()">
+<div class="flip_wrap">
+<div class="flipper">
+<div class="front"><img class="running_img" alt="orange running man" src="assets/2.png"></div>
+<div class="back"><img class="running_img" alt="blue running man" src="assets/1.png" ></div>
+</div>
+</div>
+<div id="loading_txt">Loading</div>
+</div>
+
+
+
+<div id="titletext">Portal Button 1.0</div>
+<div id="live_button">
+<button id="bigbutton" onclick="button_clicked()"><div id="your_presses">0</div><div id="current_state">Press to<br>Check Status</div></button>
+
+<table width=100% style=" border-collapse: collapse">
+   <tr>
+ <th width=20%><div id="battery">0</div></th><th width=60%><div id="last_time">0</div></th><th width=20%><div id="strength">0</div></th>
+  </tr>
+</table>
+
+
+
+<div id="live_stat_div" class="boxed"  style="height:300px; width: 100%; " ></div>
+<table width=100% style=" border-collapse: collapse">
+ <tr>
+ <th  width=25% ></th><th  width=25%><u>Total</u></th><th  width=25%><u>Physical</u></th><th width=25%><u>Web</u></th>
+  </tr>
+   <tr>
+ <th>Presses:</th><th><div id="total_presses">0</div></th><th><div id="phyiscal_presses">0</div></th><th><div id="web_presses">0</div></th>
+  </tr>
+
+   <tr>
+ <th width=20%>Users:</th><th width=25%><div id="total_users">0</div></th><th width=25%><div id="phy_users">0</div></th><th width=25%><div id="web_users">0</div></th>
+  </tr>
+</table>
+
+<div id="blurb">All Presses are sent to the Button.<br>If the Button is offline, they will not count.
+ </div>
+  </div>
+<script>
+
+
+
+var secret_menu_clicks = 0; //keeps track of clicks to load secret menu
+var running_man_orientation = 0; //spin in degrees
+var suppress_menu_close = 0; //this needs to be set before forcing open the menu
+
+function force_menu(){
+	suppress_menu_close = 1;
+	$('#menu_icon').trigger('click');
+}
+
+//initial menu setup, since init portal is orange set to blue
+$(document).ready(function() {
+	//prep the menu, set init color, and hide secret items
+	$('.menu').dropit();	
+	$(".menu ul.dropit-submenu a").addClass("blue");
+	$(".menu li:eq(5)").hide();
+	$(".menu li:eq(6)").hide();
+	$(".menu li:eq(7)").hide();
+	$(".menu li:eq(8)").hide();
+	$(".menu li:eq(9)").hide();
+
+});
+function rotate_running_man(){
+	running_man_orientation += 180;
+	$(".flipper").css("transform", "rotateY("+running_man_orientation+"deg)");
+}
+function running_man_click(){
+	rotate_running_man();
+	secret_menu_clicks++;
+	if (secret_menu_clicks == 5){
+		titletext.innerHTML = "Unlocked!"
+		$(".menu li:eq(5)").show();
+		$(".menu li:eq(6)").show();
+		$(".menu li:eq(7)").show();
+		$(".menu li:eq(8)").show();
+		$(".menu li:eq(9)").show();
+		suppress_menu_close = 1;
+		$('#menu_icon').trigger('click');
+	}
+}
+
+
+//datepicker_show();
+local_count = 0;
+
+var set_search_time = true;
+refresh_rate = 5000;
+time_to_check = 20000;
+datapoints = 8;
+points_to_load = datapoints;
+first_count = -1
+online_check_needed = true;
+online_check_in_progress = false;
+update_countdown = 0;
+send_counter = 0;
+last_loaded_time = 0;
+
+var interval_obj1;
+var interval_obj2;
+send_requested = false;
+
+
+set_mode(1);
+
+
+
+
+function initiate_search(){
+}
+
+function set_mode(mode_req){
+	live_mode = mode_req;
+	
+	clearTimeout(interval_obj1);
+	clearTimeout(interval_obj2);
+	if (live_mode){
+
+		points_to_load = datapoints;
+		document.getElementById("live_button").style.display = "inline";
+		get_data();
+	}else{
+	
+		document.getElementById("live_button").style.display = "none";
+	}
+}
+
+
+function datepicker_show(){
+	search_again_button.style.display = 'none';
+	find_button.style.display = 'inline';
+	hist_results.style.display = 'none';
+	if (set_search_time == true){
+		var date = Date.now();
+		$('#datetimepicker').datetimepicker({inline:true,theme:'dark',mask:true,value:date});
+		set_search_time = false;
+	}else{
+	   $('#datetimepicker').datetimepicker({inline:true,theme:'dark',mask:true});
+	}
+	$('#datetimepicker').show(); 
+}
+
+
+function do_send(){
+	if(send_requested){
+		send_requested = false;
+		jQuery.get('send.php', null, function(tsv) {
+		if(tsv.includes("Ratelimiting")){
+			send_requested = true;
+		}
+		});	
+	}
+}
+
+
+function update_status(){
+	if( online_check_in_progress){
+		if (update_countdown > 0){
+			current_state.innerHTML = "Checking... " + update_countdown + "<br>&#8203;";
+			update_countdown = update_countdown -1;
+			setTimeout(update_status, 1000);
+		}else{
+			online_check_in_progress = false;
+			current_state.innerHTML = "Offline<br>&#8203;";
+		}
+	}
+}
+
+function button_clicked(){
+
+	local_count = local_count + 1;
+	your_presses.innerHTML = local_count;
+	jQuery.get('click.php');
+	if (online_check_needed && local_count  == 1){
+		update_countdown = time_to_check / 1000;
+		online_check_in_progress =true;
+		setTimeout(update_status, 0);
+	}
+	send_requested = true;
+}
+
+
+function get_data() {
+	$('#loading_txt').stop(true,true).show();
+	jQuery.get('get_count.php', null, function(tsv) {
+		
+		
+		var line = tsv.split("\t");
+		
+		var timestamp = line[0];
+		var phy_count = Number(line[1]);
+		var web_count = Number(line[2]);
+		var phy_users_data = Number(line[3]);
+		var web_users_data = Number(line[4]);
+		battery.innerHTML  = "<i class=\"fa fa-battery-4 fa-fw\"></i><br>" +  String((Number(line[5])/1000).toFixed(1)) + "V" ;
+		strength.innerHTML  ="<i class=\"fa fa-signal fa-fw\"></i><br>"+  String(line[6]) + "%" ;
+		var total_count =  phy_count + web_count;
+		total_presses.innerHTML = total_count;
+		
+		phyiscal_presses.innerHTML = phy_count;
+		web_presses.innerHTML = web_count;
+		total_users.innerHTML = phy_users_data + web_users_data;
+		phy_users.innerHTML = phy_users_data;
+		web_users.innerHTML = web_users_data;
+		
+		var strDateTime = timestamp;
+		var myDate = new Date(strDateTime);
+		last_time.innerHTML = myDate.toLocaleString();
+		
+		var time_now = Number(Date.now()) - myDate.getTimezoneOffset()*60*1000;
+		
+		if (time_now - last_loaded_time > refresh_rate * 1.5){
+			points_to_load = datapoints;
+		}
+		last_loaded_time = time_now;
+	
+		if (points_to_load > 1){
+			make_graph();
+		}
+		
+		for (var i = points_to_load; i > 0; i--) {
+			live_stat_div.series[0].addPoint([time_now - i * refresh_rate, total_count], false, true);
+		}
+		
+		points_to_load = 1;
+
+		if (live_stat_div.options.series[0].visible == false) {
+			live_stat_div.series[0].show();
+		}
+		
+		if (first_count == -1){
+			first_count = total_count;
+		}
+		if (first_count != total_count){
+			online_check_needed = false;
+			online_check_in_progress = false;
+			current_state.innerHTML = "Online<br>&#8203;";
+		}
+		
+		//redraw here
+		live_stat_div.redraw();
+
+	});	
+	
+	if (live_mode == 1 ){
+		interval_obj1 = setTimeout(do_send, refresh_rate/2);	
+		interval_obj2 = setTimeout(get_data, refresh_rate);
+	}
+			if (document.visibilityState == "visible"){
+				rotate_running_man();
+				setTimeout(function(){
+					$( "#loading_txt" ).fadeOut("slow");
+				},300);
+			}
+
+}
+
+function make_graph() {
+	
+	var options = {
+chart: {
+renderTo: 'live_stat_div',
+defaultSeriesType: 'spline',
+zoomType: 'x',		   backgroundColor: '#404040'
+}, 
+title: {text: 'Live Total Count:'	  ,      style: {
+            color: '#FFFFFF',
+   
+        }	}, tooltip: { 
+        enabled: false
+    },credits: {
+        enabled: false
+    },xAxis: {
+title: {text: null			},    
+type: 'datetime',"labels": {	"format": "{value:%m-%d-%y<br>%I:%M:%S%p}", "style":{"color": "#FFFFFF"	}}		},
+yAxis: { "labels": { "style":{"color": "#FFFFFF"	}} , title: {text: null			},plotLines: [{value: 0,width: 1,color: '#808080'			}]		},
+plotOptions: {
+series: {marker: {enabled: true	}}},legend: {enabled: false,  },series: [{name: 'Button Presses',visible: false	}]};
+
+	options.series[0].data = Array.apply(null, new Array(datapoints)).map(Number.prototype.valueOf,0);
+	
+	live_stat_div = new Highcharts.Chart(options);
+}
+</script>
+</body>
+</html>
