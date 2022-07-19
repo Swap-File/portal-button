@@ -16,7 +16,7 @@ SYSTEM_THREAD(ENABLED);
 
 uint32_t ranking = 0;
 
-#define MESSAGE_LIMIT_ACTIVE 4
+#define MESSAGE_LIMIT_ACTIVE 1
 #define MESSAGE_LIMIT_IDLE 1
 
 #define PUBLISH_TIME 5000 // expose this?
@@ -108,7 +108,7 @@ void button_press(void)
 void display_reinit(void)
 {
 
-  if (batterylevel < 14)
+  if (batterylevel < 14000)
     display.reset(1);
   else
     display.reset(0);
@@ -178,8 +178,8 @@ bool eeprom_store_phy(void)
 }
 void update_battery(bool force)
 {
-  if(force)
-  batterylevel =((float)analogRead(A0)) * 4.53;
+  if (force)
+    batterylevel = ((float)analogRead(A0)) * 4.53;
   else
     batterylevel = (float)batterylevel * .97 + .03 * ((float)analogRead(A0)) * 4.53;
 }
@@ -275,19 +275,19 @@ void decay_rank()
   }
 }
 
-void update_info(void){
-    update_stats();
-    char line1[30];
-    display.clearDisplay();
-    display.setCursor(0, 0);
-    sprintf(line1, "Bat %.2fV", ((float)batterylevel) / 1000);
-    display.print(line1);
-    sprintf(line1, "Signal %%%d", signal_rssi);
-    display.setCursor(0, 16);
-    display.print(line1);
-    display.display();
-    Particle.process();
-
+void update_info(void)
+{
+  update_stats();
+  char line1[30];
+  display.clearDisplay();
+  display.setCursor(0, 0);
+  sprintf(line1, "Bat %.2fV", ((float)batterylevel) / 1000);
+  display.print(line1);
+  sprintf(line1, "Signal %%%d", signal_rssi);
+  display.setCursor(0, 16);
+  display.print(line1);
+  display.display();
+  Particle.process();
 }
 
 void update_loop(void)
@@ -355,14 +355,15 @@ void setup(void)
   Particle.subscribe("web_button", subscription_button);
   Particle.function("web_text", subscription_text);
   Particle.publishVitals(3600);
+  update_battery(true);
   sprintf(temp_string, "Users Online: 0");
   eeprom_load();
   display_reinit();
-  update_battery(true);
-  while( !Particle.connected() &&  digitalRead(D2) == TRUE){
-        update_info();
-  }
 
+  while (!Particle.connected() && digitalRead(D2) == TRUE)
+  {
+    update_info();
+  }
 }
 
 void do_housekeeping(void)
@@ -474,14 +475,14 @@ void loop(void)
   if (millis() - phy_count_time < 20000)
   { // check if phrase has been said
     uint32_t start_time = millis();
-    while (millis() - start_time < 20000)
+    while (millis() - start_time < 65000)
     {
       display.clearDisplay();
 
       display.setCursor(refresh_count_text(count_text), flip_display ? 0 : 16);
       display.print(count_text);
 
-      if (millis() - start_time < 2000)
+      if (millis() - start_time < 1500)
       {
         sprintf(temp_string, "You Rate");
       }
