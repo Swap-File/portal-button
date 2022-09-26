@@ -3,6 +3,7 @@
 <head>
 <meta name="darkreader-lock">
 <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
+
 <meta content="text/html;charset=utf-8" http-equiv="Content-Type">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0,user-scalable=0">
 <title>Portal Button 1.0</title>
@@ -76,12 +77,55 @@
   </tr>
 </table>
 
-<div id="blurb">All Presses are sent to the Button.<br>If the Button is offline, they will not count.
+<div id="blurb">All Presses are sent to the Button.<br>If the Button is offline they will not count.
  </div>
   </div>
+  
+  
+ 
+<div id="histpage">
+
+<div id="hist_buttons">
+<input class="histbutton" type="button" onclick="req_id(-5)" value="<<">
+<input class="histbutton" type="button" onclick="req_id(-1)" value="<">
+<input id="search_button" type="button" onclick="browser_toggle()" value= "Search">
+<input class="histbutton" type="button" onclick="req_id(1)" value= ">">
+<input class="histbutton" type="button" onclick="req_id(5)" value=">>">
+</div>
+
+
+<div id="hist_div">
+<div id="search_text"></div>
+<div id="container"></div>
+</div>
+
+<div id="searcher">
+
+<br>
+
+Days of data to fetch:
+
+<select name="option_days" id="option_days">
+  <option value="7">7</option>
+  <option value="14">14</option>
+  <option value="30">30</option>
+</select>
+<br>
+<input id="find_button" type="button"  value="Start Search" onclick="initiate_search()" ><br>
+<input id="search_again_button" type="button"  value="Search Again" onclick="datepicker_show()" >
+
+<br>
+
+
+
+<input id="datetimepicker" type="text">
+
+</div>
+</div>
+
 <script>
 
-
+var days = 7;
 
 var secret_menu_clicks = 0; //keeps track of clicks to load secret menu
 var running_man_orientation = 0; //spin in degrees
@@ -147,10 +191,30 @@ send_requested = false;
 set_mode(1);
 
 
+var latest_time = Date.now() ;
 
+function browser_toggle(){
 
-function initiate_search(){
+	if (search_button.value ==  "Search"){
+		search_button.value = "Close";
+		
+		hist_div.style.display = 'none';
+		searcher.style.display = 'block';
+		
+		datepicker_show();
+	}else{
+		browser_close();
+	}
 }
+function browser_close(){
+	search_button.value = "Search";
+	$('#datetimepicker').datetimepicker('destroy');
+	$('#datetimepicker').hide();
+	searcher.style.display = 'none';
+	hist_div.style.display  = 'block';
+}
+
+
 
 function set_mode(mode_req){
 	live_mode = mode_req;
@@ -161,25 +225,24 @@ function set_mode(mode_req){
 
 		points_to_load = datapoints;
 		document.getElementById("live_button").style.display = "inline";
+			document.getElementById("histpage").style.display = "none";
 		get_data();
 	}else{
 	
 		document.getElementById("live_button").style.display = "none";
+		document.getElementById("histpage").style.display = "inline";
+		graph();
+
+request_data(latest_time);
+
 	}
 }
 
 
 function datepicker_show(){
-	search_again_button.style.display = 'none';
-	find_button.style.display = 'inline';
-	hist_results.style.display = 'none';
-	if (set_search_time == true){
-		var date = Date.now();
-		$('#datetimepicker').datetimepicker({inline:true,theme:'dark',mask:true,value:date});
-		set_search_time = false;
-	}else{
-	   $('#datetimepicker').datetimepicker({inline:true,theme:'dark',mask:true});
-	}
+
+	$('#datetimepicker').datetimepicker({inline:true,theme:'dark',mask:true,value: new Date( latest_time ) });
+	
 	$('#datetimepicker').show(); 
 }
 
@@ -235,7 +298,7 @@ function get_data() {
 		var web_count = Number(line[2]);
 		var phy_users_data = Number(line[3]);
 		var web_users_data = Number(line[4]);
-		battery.innerHTML  = "<i class=\"fa fa-battery-4 fa-fw\"></i><br>" +  String((Number(line[5])/1000).toFixed(1)) + "V" ;
+		battery.innerHTML  = "<i class=\"fa fa-battery-4 fa-fw\"></i><br>" +  String(battery_volt_to_percent(Number(line[5]))) + "%" ;
 		strength.innerHTML  ="<i class=\"fa fa-signal fa-fw\"></i><br>"+  String(line[6]) + "%" ;
 		var total_count =  phy_count + web_count;
 		total_presses.innerHTML = total_count;
@@ -324,6 +387,286 @@ series: {marker: {enabled: true	}}},legend: {enabled: false,  },series: [{name: 
 	
 	live_stat_div = new Highcharts.Chart(options);
 }
+
+
+
+var days_to_fetch = 7;
+	
+var chart2;
+var series_active = 0;
+
+Highcharts.setOptions({
+    colors: ['#058DC7', '#50B432', '#ED561B', '#DDDF00', '#24CBE5', '#64E572', '#FF9655', '#FFF263', '#6AF9C4']
+});
+
+function battery_volt_to_percent(voltage){
+	// 16800 is full 13300 is empty
+	
+	if (voltage < 13300.0){
+	return 0;
+	}
+	return Math.round((voltage - 13300.0)/ (16800.0-13300.0) * 100);
+}
+function initiate_search(){
+
+	days_to_fetch = Number(document.getElementById("option_days").value);
+	latest_time = parseInt($('#datetimepicker').datetimepicker('getValue').getTime());
+	request_data( latest_time);
+	browser_close();
+}
+
+function req_id(days){
+	days_to_fetch = Number(document.getElementById("option_days").value);
+
+	latest_time = latest_time + (60 * 60 * 24 * days * 1000);
+	$('#datetimepicker').datetimepicker({inline:true,theme:'dark',mask:true,value:new Date( latest_time )});
+	request_data( latest_time);
+		 browser_close();
+}
+
+function request_data(time2) {
+
+	earliest_time = time2  - (60 * 60 * 24 * days_to_fetch * 1000);		
+		
+    $.post('get_log.php', {time1: earliest_time,time2: time2}, function(data) {
+
+        series_phy_count = [];
+        series_web_count = [];
+        series_total_count = [];
+        series_phy_users = [];
+        series_web_users = [];
+        series_battery = [];
+        series_signal = [];
+		
+		var time_last = 0;
+	
+        var lines = data.trim().split('\n');
+
+
+		var myDate = new Date(earliest_time);
+		var first_stamp = Number(myDate) - myDate.getTimezoneOffset() * 60 * 1000;
+		
+		series_total_count.push([first_stamp, null]);
+		series_phy_count.push([first_stamp,null]);
+		series_web_count.push([first_stamp,null]);
+		series_phy_users.push([first_stamp,null]);
+		series_web_users.push([first_stamp,null]);
+		series_battery.push([first_stamp, null]);
+		series_signal.push([first_stamp, null]);
+
+		
+        for (var i = 0; i < lines.length; i++) {
+
+			
+            var line = lines[i].split('\t');
+			
+            if (line.length == 7) {
+			
+                var myDate = new Date(line[0]);
+								
+				
+                var time_now = Number(myDate) - myDate.getTimezoneOffset() * 60 * 1000;
+				
+				if (time_now - time_last > 60 * 1000 * 60 * 1 && time_last != 0){  // separate lines if longer than an hour
+					series_total_count.push([time_now -1 , null]);
+					series_phy_count.push([time_now -1,null]);
+					series_web_count.push([time_now -1,null]);
+					series_phy_users.push([time_now -1,null]);
+					series_web_users.push([time_now -1,null]);
+					series_battery.push([time_now -1, null]);
+					series_signal.push([time_now -1, null]);
+				}
+				time_last = time_now;
+				
+                series_total_count.push([time_now, Number(line[2]) + Number(line[1])]);
+                series_phy_count.push([time_now, Number(line[1])]);
+                series_web_count.push([time_now, Number(line[2])]);
+                series_phy_users.push([time_now, Number(line[3])]);
+                series_web_users.push([time_now, Number(line[4])]);
+                series_battery.push([time_now, battery_volt_to_percent(Number(line[5]))]);
+                series_signal.push([time_now, Number(line[6])]);
+            }
+
+        }
+		
+		var myDate = new Date(time2);
+		var last_stamp = Number(myDate) - myDate.getTimezoneOffset() * 60 * 1000;
+		
+		
+		series_total_count.push([last_stamp, null]);
+		series_phy_count.push([last_stamp,null]);
+		series_web_count.push([last_stamp,null]);
+		series_phy_users.push([last_stamp,null]);
+		series_web_users.push([last_stamp,null]);
+		series_battery.push([last_stamp, null]);
+		series_signal.push([last_stamp, null]);
+		
+		search_text.innerHTML = (new Date(earliest_time)).toLocaleString() + " to " + (new Date(latest_time)).toLocaleString();
+
+        var length = chart2.series.length;
+        if (length) {
+            for (var j = 0; j < length; j++) {
+                chart2.series[0].remove(false);
+            }
+        }
+        chart2.addSeries({
+            name: "Total Count",
+            data: series_total_count,
+			
+
+        });
+        chart2.addSeries({
+            name: "Physical Count",
+            data: series_phy_count,
+
+        });
+        chart2.addSeries({
+            name: "Web Count",
+            data: series_web_count,
+
+        });
+
+        chart2.addSeries({
+            name: "Signal %",
+            data: series_signal,
+
+        });
+        chart2.addSeries({
+            name: "Battery %",
+            data: series_battery,
+
+        });
+
+        chart2.addSeries({
+            name: "Physical Users",
+            data: series_phy_users,
+
+        });
+        chart2.addSeries({
+            name: "Web Users",
+            data: series_web_users,
+
+        });
+
+        chart2.series[series_active].show();
+        chart2.zoom();
+
+    });
+}
+
+
+
+
+function graph() {
+
+    chart2 = Highcharts.chart('container', {
+        chart: {
+           
+            zoomType: 'x',
+            resetZoomButton: {
+                position: {
+                    x: 0,
+                    y: -40
+                }
+            },
+            backgroundColor: '#404040'
+        },
+        title: {
+            text: 'Portal Button',
+            style: {
+                color: '#FFFFFF'
+            }
+        },
+        subtitle: {
+            style: {
+                color: '#FFFFFF'
+            }
+        },
+        credits: {
+            enabled: false
+        },
+        xAxis: {
+            "labels": {
+                "style": {
+                    "color": "#FFFFFF"
+                }
+            },
+            type: 'datetime',
+            events: {
+                afterSetExtremes() {
+                    if (this.displayBtn) {
+                        chart2.update({
+                            subtitle: {
+                                align: 'right',
+                                text: 'Zoomed'
+                            }
+                        });
+                    } else {
+                        chart2.update({
+                            subtitle: {
+                                align: 'center',
+                                text: document.ontouchstart === undefined ?
+                                    'Click and drag to zoom' : 'Pinch the chart to zoom'
+                            }
+                        });
+                    }
+                }
+            }
+
+        },
+        yAxis: {
+            "labels": {
+                "style": {
+                    "color": "#FFFFFF"
+                }
+            },
+            title: {
+                text: null
+
+            }
+        },
+        legend: {
+            itemStyle: {
+                color: '#FFFFFF',
+                fontWeight: 'bold'
+            },
+            layout: 'vertical',
+            align: 'center',
+            verticalAlign: 'bottom'
+        },
+        plotOptions: {
+            series: {
+       label: {
+                connectorAllowed: false
+            },
+                events: {
+                    show: function() {
+                        var chart2 = this.chart,
+                            series = chart2.series,
+                            i = series.length,
+                            otherSeries;
+                        while (i--) {
+                            otherSeries = series[i];
+                            if (otherSeries != this && otherSeries.visible) {
+                                otherSeries.hide();
+                            } else if (otherSeries == this) {
+                                series_active = i;
+                            }
+                        }
+                    },
+                    legendItemClick: function() {
+                        if (this.visible) {
+                            return false;
+                        }
+
+                    }
+                }
+            }
+        },
+
+    });
+}
+
 </script>
 </body>
 </html>

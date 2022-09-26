@@ -18,7 +18,10 @@ a:active {
 	text-decoration: underline;
 }
 
-
+#search_text{
+	font-size: 14px;
+	padding-bottom: 5px;
+}
 
 body {
 	padding-top: 5px;
@@ -59,8 +62,20 @@ body {
 	width:60px;
 	
 }
+#searcher{
+	 display: none;
+}
+#hist_buttons{
+		width:100%;
+
+
+	padding-top: 45px;
+	padding-bottom: 5px;
+}
 #hist_browser,#search_again_button,#histpage{
 	display: none;
+	width:100%;
+
 }
 #hist_browser{
 	padding-top: 5px;

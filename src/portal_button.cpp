@@ -33,6 +33,8 @@ unsigned int web_count;
 unsigned int web_users = 0;
 unsigned int phy_users = 0;
 
+int burn_in_offset = 0;
+
 // the todo list from the web
 unsigned int web_count_todo = 0;
 unsigned int web_rate_todo = 0;
@@ -108,10 +110,10 @@ void button_press(void)
 void display_reinit(void)
 {
 
-  if (batterylevel < 14000)
-    display.reset(1);
-  else
-    display.reset(0);
+  //if (batterylevel < 14000)
+  //  display.reset(1);
+  //else
+  display.reset(0);
 
   display.clearDisplay();
   display.setTextSize(2);
@@ -179,9 +181,9 @@ bool eeprom_store_phy(void)
 void update_battery(bool force)
 {
   if (force)
-    batterylevel = ((float)analogRead(A0)) * 4.53;
+    batterylevel = ((float)analogRead(A1)) * 4.53;
   else
-    batterylevel = (float)batterylevel * .97 + .03 * ((float)analogRead(A0)) * 4.53;
+    batterylevel = (float)batterylevel * .97 + .03 * ((float)analogRead(A1)) * 4.53;
 }
 void update_stats()
 {
@@ -389,15 +391,23 @@ void slide_animation()
   // hide a housekeeping task at the start of the slide animation
   do_housekeeping();
 
+  int current_burn = burn_in_offset;
+  burn_in_offset = random(0,6) -1;
+
   // slide animation for count text
   for (int i = 0; i < 17; i++)
   {
     display.clearDisplay();
 
-    display.setCursor(refresh_count_text(count_text), flip_display ? i : 16 - i);
+    display.setCursor(refresh_count_text(count_text) + current_burn, flip_display ? i : 16 - i);
     display.print(count_text);
 
     display.display();
+
+    if (current_burn > burn_in_offset && i > 7)
+      current_burn--;
+    if (current_burn < burn_in_offset && i > 7)
+      current_burn++;  
 
     update_loop();
   }
@@ -459,7 +469,7 @@ void loop(void)
   {
     display.clearDisplay();
 
-    display.setCursor(refresh_count_text(count_text), flip_display ? 0 : 16);
+    display.setCursor(refresh_count_text(count_text) + burn_in_offset, flip_display ? 0 : 16);
     display.print(count_text);
 
     display.setCursor(128 - (i * 2), flip_display ? 16 : 0);
@@ -472,14 +482,14 @@ void loop(void)
 
   slide_animation();
 
-  if (millis() - phy_count_time < 20000)
+  if (millis() - phy_count_time < 10000)
   { // check if phrase has been said
     uint32_t start_time = millis();
-    while (millis() - start_time < 65000)
+    while (millis() - start_time < 7000)
     {
       display.clearDisplay();
 
-      display.setCursor(refresh_count_text(count_text), flip_display ? 0 : 16);
+      display.setCursor(refresh_count_text(count_text) + burn_in_offset, flip_display ? 0 : 16);
       display.print(count_text);
 
       if (millis() - start_time < 1500)
